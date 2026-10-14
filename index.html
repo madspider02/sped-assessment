@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex,nofollow" />
-<title>特殊教育鑑定資料整合與專業研判輔助系統｜GitHub＋Sheets v6</title>
+<title>特殊教育鑑定資料整合與專業研判輔助系統｜GitHub＋Sheets v7</title>
 <style>
 :root{--ink:#1c3239;--muted:#627983;--line:#dce5e6;--bg:#f4f7f8;--white:#fff;--accent:#146d73;--soft:#eaf5f4;--warn:#945e20;--warnbg:#fff7e9;--bad:#963c45;--ok:#22704f}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
@@ -77,8 +77,8 @@ const CATEGORIES={
 const IQ_INDEX={WPPSI4_Y:[['VCI','語文理解'],['VSI','視覺空間'],['WMI','工作記憶']],WPPSI4_O:[['VCI','語文理解'],['VSI','視覺空間'],['FRI','流體推理'],['WMI','工作記憶'],['PSI','處理速度']],WISC4:[['VCI','語文理解'],['PRI','知覺推理'],['WMI','工作記憶'],['PSI','處理速度']],WISC5:[['VCI','語文理解'],['VSI','視覺空間'],['FRI','流體推理'],['WMI','工作記憶'],['PSI','處理速度']]};
 const INDEX_LABEL={VCI:'語文理解',VSI:'視覺空間',FRI:'流體推理',WMI:'工作記憶',PSI:'處理速度',PRI:'知覺推理'};
 let page=0;let activeCat='id';let saving=false;let latestSubmitted=false;let submittedCase=null;
-let lastPdf=null;let lastReceipt=null;let submissionAttempt=null;
-let S={meta:{mode:'anonymous',name:'',alias:'',sex:'',dob:'',assessDate:'',stage:'',grade:'',assessor:'',submitterEmail:''},concerns:{reason:'',strengths:'',history:'',focus:[]},iq:{status:'none',test:'',date:'',FSIQ:null,CI_low:null,CI_high:null,index:{}},adaptive:{status:'none',rater:'',raterOther:'',date:'',general:DOMAINS.map(()=>({standard:null,percentile:''})),idScores:Array(12).fill(null)},evidence:Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,CATEGORIES[k].questions.map(()=>({status:'unknown',note:''}))])),review:{category:'待進一步評估',basis:'',needs:'',supports:'',gaps:'',agreement:false}};
+let lastPdf=null;let submissionAttempt=null;
+let S={meta:{mode:'anonymous',name:'',alias:'',sex:'',dob:'',assessDate:'',stage:'',grade:'',assessor:''},concerns:{reason:'',strengths:'',history:'',focus:[]},iq:{status:'none',test:'',date:'',FSIQ:null,CI_low:null,CI_high:null,index:{}},adaptive:{status:'none',rater:'',raterOther:'',date:'',general:DOMAINS.map(()=>({standard:null,percentile:''})),idScores:Array(12).fill(null)},evidence:Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,CATEGORIES[k].questions.map(()=>({status:'unknown',note:''}))])),review:{category:'待進一步評估',basis:'',needs:'',supports:'',gaps:'',agreement:false}};
 const el=id=>document.getElementById(id);
 const safe=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const v=(x)=>x==null?'':safe(x);const fmt=x=>x==null||x===''?'—':safe(x);
@@ -197,9 +197,6 @@ function render7(){return `<section class="panel"><h2>07　教師初步研判與
  ${ta('學生／幼兒的教育特殊需求','review.needs','','例如：學習方式、溝通、行為、生活自理與參與需求')}
  ${ta('課程調整與支持服務建議','review.supports','','包括課程內容、歷程、環境、評量與相關服務')}
  ${ta('仍待補充的資料或不同意見','review.gaps','','如資料間有矛盾，也請記錄')}</div>
- <hr class="sectionrule"><h3>PDF 報告寄送（選填）</h3><div class="grid">
- ${fld('填寫者 Email','meta.submitterEmail','email','maxlength="254" autocomplete="email" inputmode="email"','', 'name@example.edu.tw')}
- <div class="muted" style="align-self:center">填寫 Email 後，若此信箱已獲後台核准，系統會在資料儲存成功後寄送 PDF 摘要；不填寫仍可下載 PDF。請確認收件人有權接收個案評估資料。</div></div>
  <hr class="sectionrule"><label class="choice"><input type="checkbox" data-agreement="1" ${S.review.agreement?'checked':''}>我已檢查資料，了解此摘要不是正式鑑定結論，仍須由鑑定專業人員依規定綜合研判。</label>
  <div id="submitMessage" style="margin-top:14px"></div></section>`}
 function svgChart(values,labels,opt={}){const entries=values.map((v,i)=>({v:numeric(v),i})).filter(x=>x.v!==null);if(!entries.length)return `<div class="chart-empty">尚無可繪製的正式分數</div>`;const width=680,height=270,ml=56,mr=18,mt=30,mb=80;const arr=entries.map(x=>x.v);if(opt.threshold!=null)arr.push(opt.threshold);let min=Math.floor((Math.min(...arr)-10)/10)*10,max=Math.ceil((Math.max(...arr)+10)/10)*10;if(min===max){min-=10;max+=10}const X=i=>ml+i*(width-ml-mr)/(labels.length-1),Y=v=>mt+(max-v)*(height-mt-mb)/(max-min);let bits=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${safe(opt.label||'折線圖')}">`;for(let j=0;j<=4;j++){let val=min+(max-min)*j/4,y=Y(val);bits+=`<line x1="${ml}" x2="${width-mr}" y1="${y}" y2="${y}" stroke="#e3eeee" stroke-width="1"/><text x="${ml-8}" y="${y+4}" font-size="12" fill="#6a8388" text-anchor="end">${numFmt(val)}</text>`}if(opt.threshold!=null&&opt.threshold>=min&&opt.threshold<=max){const y=Y(opt.threshold);bits+=`<line x1="${ml}" x2="${width-mr}" y1="${y}" y2="${y}" stroke="#bb8741" stroke-dasharray="7 5"/><text x="${width-mr-4}" y="${y-7}" text-anchor="end" fill="#926023" font-size="11">提示值 ${opt.threshold}</text>`}for(let i=0;i<labels.length;i++){bits+=`<text x="${X(i)}" y="${height-51}" text-anchor="middle" fill="#516b72" font-size="12">${safe(labels[i].replace('能力','').replace('表現','').replace('（領域）',''))}</text>`}for(let j=0;j<entries.length-1;j++){if(entries[j+1].i===entries[j].i+1)bits+=`<line x1="${X(entries[j].i)}" y1="${Y(entries[j].v)}" x2="${X(entries[j+1].i)}" y2="${Y(entries[j+1].v)}" stroke="#167b83" stroke-width="3"/>`}for(const x of entries){bits+=`<circle cx="${X(x.i)}" cy="${Y(x.v)}" r="5" fill="#157a83" stroke="#fff" stroke-width="2"/><text x="${X(x.i)}" y="${Y(x.v)-12}" text-anchor="middle" fill="#165f68" font-size="13" font-weight="700">${numFmt(x.v,2)}</text>`}bits+='</svg>';return bits}
@@ -245,7 +242,7 @@ function validatePage(n=page){
   }
   if(showID()&&S.adaptive.idScores.some(x=>x!==null&&(x<0||!Number.isFinite(x))))return '智能障礙學生組分量表的量表分數請填非負數。';
  }
- if(n===6){if(!S.review.agreement)return '請確認資料整理不是正式鑑定結果。';if(!S.review.basis.trim())return '請填入專業初步研判的主要證據。';const email=S.meta.submitterEmail.trim();if(email&&!/^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(email))return '請確認填寫者 Email 格式是否正確。';}
+ if(n===6){if(!S.review.agreement)return '請確認資料整理不是正式鑑定結果。';if(!S.review.basis.trim())return '請填入專業初步研判的主要證據。';}
  return '';
 }
 function toast(msg,kind='warn'){el('toast').innerHTML=notice(safe(msg),kind);el('toast').scrollIntoView({behavior:'smooth',block:'nearest'});setTimeout(()=>{if(el('toast'))el('toast').innerHTML=''},6500)}
@@ -302,36 +299,16 @@ async function exportPdf(savedId){
  lastPdf=pdf;
  return pdf;
 }
-function mailInfo(receipt){
- if(!S.meta.submitterEmail.trim())return '';
- const s=receipt?.emailStatus;
- if(s==='sent')return notice('PDF 摘要已由後台寄送至填寫者 Email，請留意收件匣或垃圾郵件匣。','success');
- if(s==='already_sent')return notice('這份個案報告先前已寄送過，系統不會重複寄信。','success');
- if(s==='pending')return notice('電子郵件仍在處理，請先查看信箱；為避免重複寄送，系統已暫停再次寄信。','warn');
- const reason=safe(receipt?.emailMessage||'請確認後端寄信權限與配額。');
- return notice(`Google Sheets 已儲存，但 Email 未能寄出：${reason}`,'warn')+
-  '<div class="feedback-actions"><button type="button" class="btn ghost" id="retryEmail">重試寄送 Email</button></div>';
-}
-async function pdfAfterSaved(caseId,receipt){
- setSubmitStatus(notice('資料已儲存，正在產生可下載的 PDF…','success')+mailInfo(receipt));
+async function pdfAfterSaved(caseId){
+ setSubmitStatus(notice('資料已儲存，正在產生可下載的 PDF…','success'));
  try{
   const pdf=await exportPdf(caseId);
   setSubmitStatus(notice(`資料已成功儲存。個案編號：${safe(caseId)}；PDF 已開始下載。`,'success')+
-    mailInfo(receipt)+`<div class="feedback-actions"><a class="btn ghost" href="${pdf.url}" download="${safe(pdf.name)}">再次下載 PDF</a></div>`);
+    `<div class="feedback-actions"><a class="btn ghost" href="${pdf.url}" download="${safe(pdf.name)}">再次下載 PDF</a></div>`);
  }catch(err){
   setSubmitStatus(notice(`資料已儲存，但本機 PDF 產生失敗：${safe(err.message)}。可嘗試「重新產生 PDF」。`,'warn')+
-    mailInfo(receipt)+'<div class="feedback-actions"><button type="button" class="btn" id="retryPdf">重新產生 PDF</button></div>');
+    '<div class="feedback-actions"><button type="button" class="btn" id="retryPdf">重新產生 PDF</button></div>');
  }
-}
-async function retryEmail(){
- if(saving||!latestSubmitted||!submissionAttempt||!S.meta.submitterEmail.trim())return;
- saving=true;
- setSubmitStatus(notice('正在請後台確認寄送狀態…'));
- try{
-  const receipt=await sendWithIframe({...submissionAttempt,nonce:generateNonce()});lastReceipt=receipt;
-  setSubmitStatus(notice(`個案編號：${safe(receipt.caseId)}。本機 PDF 已可在下載資料夾找到。`,'success')+mailInfo(receipt));
- }catch(err){setSubmitStatus(notice(`重試寄信失敗：${safe(err.message)}`,'warn'));}
- finally{saving=false;}
 }
 async function submitAttempt(){
  if(saving||latestSubmitted)return;
@@ -343,13 +320,13 @@ async function submitAttempt(){
   submissionAttempt={caseId:generateCaseId(),nonce:generateNonce(),payload:{...data,clientCaseId:null}};
   submissionAttempt.payload.clientCaseId=submissionAttempt.caseId;
  }
- saving=true;el('nextBtn').disabled=true;el('nextBtn').textContent='正在確認 Google Sheets…';
- setSubmitStatus(notice('正在傳送至 Google Sheets。請保持此頁面開啟，等待後台確認。'));
+ saving=true;el('nextBtn').disabled=true;el('nextBtn').textContent='資料儲存中…';
+ setSubmitStatus('');
  try{
    const receipt=await sendWithIframe(submissionAttempt);
-   latestSubmitted=true;submittedCase=receipt.caseId;lastReceipt=receipt;
+   latestSubmitted=true;submittedCase=receipt.caseId;
    el('nextBtn').textContent='已確認並儲存';el('nextBtn').disabled=true;
-   await pdfAfterSaved(receipt.caseId,receipt);
+   await pdfAfterSaved(receipt.caseId);
  }catch(err){
    const msg=String(err.message||'後台尚未回覆');
    el('nextBtn').textContent='用原個案編號重試提交';el('nextBtn').disabled=false;
@@ -366,8 +343,7 @@ el('wizard').addEventListener('input',captureEvt);
 el('wizard').addEventListener('change',captureEvt);
 el('wizard').addEventListener('click',e=>{
  const cat=e.target.closest('[data-cat]');if(cat){activeCat=cat.dataset.cat;render();return}
- if(e.target.closest('#retryPdf')&&submittedCase&&!saving){pdfAfterSaved(submittedCase,lastReceipt);return}
- if(e.target.closest('#retryEmail')&&!saving){retryEmail();return}
+ if(e.target.closest('#retryPdf')&&submittedCase&&!saving){pdfAfterSaved(submittedCase);return}
  if(e.target.closest('#retrySubmit')&&!saving&&!latestSubmitted){submitAttempt();return}
 });
 el('prevBtn').addEventListener('click',()=>jump(Math.max(0,page-1)));

@@ -1,16 +1,9 @@
 /**
- * 特殊教育鑑定資料整合系統 v6 - GitHub Pages + Apps Script + Google Sheets + email PDF
+ * 特殊教育鑑定資料整合系統 v7 - GitHub Pages + Apps Script + Google Sheets
  * 只在 Apps Script 控制台執行 setupSheets()。公開端點僅提供 doPost 個案建立。
  * 本版應使用匿名測試資料先驗收；Anyone 公開部署不具備使用者身分認證。
  */
 const SPREADSHEET_ID='19cXXJfry4Xr9YHs0jcWgYcpQQX9OKOzR6sxnDFGhYkc';
-// 寄送 PDF 的最小收件限制。請在此填入「允許收信」的教師信箱或學校網域。
-// 兩個清單都為空時，只儲存 Sheets 與提供本機 PDF，不會寄送個案報告。
-// 注意：這只能限制收件對象，無法把公開 GitHub + Apps Script 變成封閉登入系統。
-const EMAIL_ALLOWED_ADDRESSES_ = []; // 範例：['teacher@example.edu.tw']
-const EMAIL_ALLOWED_DOMAINS_ = []; // 範例：['example.edu.tw']（不含 @）
-const EMAIL_PER_RECIPIENT_DAILY_LIMIT_ = 10;
-
 const GITHUB_ORIGIN='https://madspider02.github.io';
 const DOMAINS_ = ['生活自理','動作與行動能力','語言與溝通','社會人際與情緒行為','學科（領域）學習表現'];
 const SUBSCALES_ = ['飲食','穿著','衛生安全','動作','行動','語言','溝通','社會人際','情緒行為','語文','數學','綜合應用'];
@@ -116,19 +109,13 @@ function doGet(){
 function doPost(e){
  const v=e&&e.parameter||{};
  const nonce=/^[a-f0-9]{40}$/.test(String(v.nonce||''))?v.nonce:'';
- const receipt={type:'SPED_SAVE_RECEIPT',nonce,ok:false,caseId:'',message:'',emailStatus:'not_requested',emailMessage:''};
+ const receipt={type:'SPED_SAVE_RECEIPT',nonce,ok:false,caseId:'',message:''};
  try{
    assert_(nonce,'缺少本次提交識別碼。');
    assert_(typeof v.payload==='string'&&v.payload.length<=250000,'資料格式不正確或過大。');
    const p=JSON.parse(v.payload);
    const saved=saveCase(p);
    receipt.ok=true;receipt.caseId=saved.caseId;
-   // 先確保 Sheet 寫入成功，才嘗試寄 PDF。信件錯誤不影響已儲存的資料。
-   try{
-     const mail=sendReportEmail_(p,saved.caseId);
-     receipt.emailStatus=mail.status;
-     receipt.emailMessage=mail.message||'';
-   }catch(mailErr){receipt.emailStatus='failed';receipt.emailMessage=txt_(mailErr&&mailErr.message||'郵件寄送失敗',180);}
  }catch(err){receipt.message=txt_(err&&err.message||'儲存失敗',220)}
  const data=JSON.stringify(receipt).replace(/</g,'\\u003c');
  const target=JSON.stringify(GITHUB_ORIGIN);
@@ -139,8 +126,6 @@ function doPost(e){
 function saveCase(p){
   assert_(p&&p.meta&&p.concerns&&p.iq&&p.adaptive&&p.review&&p.evidence,'缺少個案必要資料。');
   const m=p.meta,iq=p.iq,ad=p.adaptive,rv=p.review;
-  const submitterEmail=String(m.submitterEmail||'').trim();
-  assert_(!submitterEmail||isEmail_(submitterEmail),'填寫者 Email 格式不正確。');
   const name=m.mode==='real'?txt_(m.name):txt_(m.alias);
   assert_(['real','anonymous'].includes(m.mode)&&name.trim(),'請選擇真實姓名或匿名，並填寫個案識別名稱。');
   assert_(txt_(m.sex).trim()&&txt_(m.stage).trim()&&txt_(m.assessor).trim(),'請完成基本資料。');
@@ -211,178 +196,7 @@ function saveCase(p){
       eSheet.getRange(start,1,addEvidence.length,HEADERS_.Evidence.length).setValues(addEvidence);
     }
     appendIfMissing_(ss,'Professional_Review',caseId,[...base,rv.category,rv.basis,rv.needs,rv.supports,rv.gaps,true]);
-    appendIfMissing_(ss,'Audit_Log',caseId,[...base,submitterEmail||'GitHubPages','CREATE_CASE','個案已儲存，待教師人工綜合研判']);
+    appendIfMissing_(ss,'Audit_Log',caseId,[...base,'GitHubPages','CREATE_CASE','個案已儲存，待教師人工綜合研判']);
     return {caseId,submittedAt:base[1],reused:existing.length>0};
   } finally {lock.releaseLock()}
-}
-
-
-/** 可用 Email 格式，且僅接受一位收件者（禁止 , ; 換行等）。 */
-function isEmail_(value){
-  const s=String(value||'').trim();
-  return s.length<=254&&/^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(s);
-}
-function mailAllowed_(email){
-  const addr=String(email||'').trim().toLowerCase();
-  const at=addr.lastIndexOf('@'),domain=addr.slice(at+1);
-  return EMAIL_ALLOWED_ADDRESSES_.some(s=>String(s).trim().toLowerCase()===addr)||
-    EMAIL_ALLOWED_DOMAINS_.some(s=>String(s).trim().replace(/^@/,'').toLowerCase()===domain);
-}
-function stamp_(){return Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyy-MM-dd HH:mm:ss')}
-function logMail_(ss,caseId,email,action,details){
-  append_(ss,'Audit_Log',[caseId,stamp_(),email,action,txt_(details,300)]);
-}
-function getMailEntries_(ss,caseId,email){
-  return rowsFor_(ss,'Audit_Log',caseId).filter(r=>String(r[2]).toLowerCase()===email.toLowerCase()&&/^EMAIL_/.test(String(r[3])));
-}
-function mailDailyCount_(ss,email){
-  const sheet=ss.getSheetByName('Audit_Log'),last=sheet.getLastRow();
-  if(last<=1)return 0;
-  const records=sheet.getRange(2,1,last-1,5).getValues();
-  const today=stamp_().slice(0,10);
-  return records.filter(r=>String(r[2]).toLowerCase()===email.toLowerCase()&&r[3]==='EMAIL_SENT'&&String(r[1]).slice(0,10)===today).length;
-}
-
-/**
- * 先以 Audit_Log 的 EMAIL_PENDING 預留寄送權，避免網路逾時後重送同一筆個案。
- * 正式信件寄送成功才寫 EMAIL_SENT；出錯則 EMAIL_FAILED，可再次嘗試。
- */
-function sendReportEmail_(p,caseId){
-  const email=String(p.meta.submitterEmail||'').trim().toLowerCase();
-  if(!email)return {status:'not_requested'};
-  if(!isEmail_(email))return {status:'failed',message:'填寫者 Email 格式不正確。'};
-  if(!mailAllowed_(email))return {status:'failed',message:'此信箱尚未列入後端核准的收件清單，請聯繫系統管理員。'};
-  let lock=LockService.getScriptLock();
-  try{
-    lock.waitLock(20000);
-    const ss=getSS_(),history=getMailEntries_(ss,caseId,email);
-    const last=history.length?String(history[history.length-1][3]):'';
-    if(history.some(r=>r[3]==='EMAIL_SENT'))return {status:'already_sent'};
-    if(last==='EMAIL_PENDING')return {status:'pending'};
-    if(mailDailyCount_(ss,email)>=EMAIL_PER_RECIPIENT_DAILY_LIMIT_)
-      return {status:'failed',message:'這個信箱已達當日寄送上限。'};
-    if(MailApp.getRemainingDailyQuota()<1)
-      return {status:'failed',message:'Google 帳號今日寄送額度已用完。'};
-    logMail_(ss,caseId,email,'EMAIL_PENDING','正在產生及寄送 PDF');
-  }catch(err){return {status:'failed',message:txt_(err&&err.message||'寄送檢查失敗',180)}}
-  finally{try{lock.releaseLock()}catch(e){}}
-  let mailReallySent=false;
-  try{
-    const pdf=createReportPdf_(p,caseId);
-    if(pdf.getBytes().length>12*1024*1024)throw new Error('PDF 超過12MB，請由瀏覽器下載。');
-    MailApp.sendEmail({
-      to:email,
-      subject:'【特殊教育鑑定資料整合系統】評量資料摘要（個案編號 '+caseId.slice(0,8)+'）',
-      body:'您好：\n\n您提交的特殊教育鑑定資料已存入系統，附件為 PDF 整合摘要。\n' +
-        '本資料涉及學生／幼兒個人與評量資訊，請妥善保管，勿任意轉寄。\n' +
-        '本摘要為教師蒐集及初步研判資料，不是正式鑑定結果。\n\n' +
-        '系統研發者：國家教育研究院黃彥融副研究員',
-      attachments:[pdf],name:'特殊教育鑑定資料整合系統'
-    });
-    mailReallySent=true;
-    lock=LockService.getScriptLock();lock.waitLock(20000);
-    try{logMail_(getSS_(),caseId,email,'EMAIL_SENT','PDF 已交由 Google 郵件服務寄送')}
-    finally{lock.releaseLock()}
-    return {status:'sent'};
-  }catch(err){
-    // 郵件發出後若只是『寫入寄送成功紀錄』出錯，不能宣稱寄送失敗並允許重寄。
-    if(mailReallySent)return {status:'pending',message:'信件已交由 Google 寄送，但後台紀錄未確認；請勿重複送出。'};
-    try{lock=LockService.getScriptLock();lock.waitLock(20000);
-      try{logMail_(getSS_(),caseId,email,'EMAIL_FAILED',txt_(err&&err.message||'郵件寄送失敗',200))}
-      finally{lock.releaseLock()}
-    }catch(logErr){
-      // 仍保留 EMAIL_PENDING；避免本次可能成功寄出卻無紀錄時，重送造成重複郵件。
-      return {status:'pending',message:'寄信狀態無法確認；請先查看信箱或後台紀錄。'};
-    }
-    return {status:'failed',message:txt_(err&&err.message||'PDF 寄送失敗',180)};
-  }
-}
-
-/**
- * 後端自動產生 PDF：不將真實個案資料傳到第三方 PDF 服務。
- * 這份郵寄 PDF 與瀏覽器下載版採相同內容欄位，但版型可略有不同。
- * 暫存的 Google Doc 在轉換後即移至垃圾桶；Email 附件本身仍由收件人管理。
- */
-function createReportPdf_(p,caseId){
-  const m=p.meta,c=p.concerns,iq=p.iq,ad=p.adaptive,rv=p.review;
-  const filename='SPED_Assessment_'+caseId.slice(0,8)+'.pdf';
-  const doc=DocumentApp.create('SPED_report_temp_'+caseId);
-  const id=doc.getId();
-  try{
-    const body=doc.getBody();
-    body.appendParagraph('特殊教育鑑定資料整合摘要').setHeading(DocumentApp.ParagraphHeading.TITLE);
-    body.appendParagraph('教師初步資料｜非正式鑑定結果');
-    body.appendParagraph('個案編號：'+caseId);
-    function heading(s){body.appendParagraph(s).setHeading(DocumentApp.ParagraphHeading.HEADING2)}
-    function rowList(rows){for(const [label,value] of rows)body.appendParagraph(label+'：'+txt_(value===null||value===undefined||value===''?'—':value,6000))}
-    function grid(heads,rows){
-      const table=[heads.map(x=>String(x)),...rows.map(r=>r.map(x=>txt_(x===null||x===undefined||x===''?'—':x,6000)))];
-      body.appendTable(table);
-    }
-    heading('一、基本資料');
-    rowList([
-      ['姓名形式',m.mode==='real'?'真實姓名':'匿名'],['個案識別',m.mode==='real'?m.name:m.alias],
-      ['性別',m.sex],['出生日期',m.dob],['評量日期',m.assessDate],['教育階段',m.stage],
-      ['年級／班別',m.grade],['填寫教師／評估人員',m.assessor]
-    ]);
-    heading('二、學習與適應困難');
-    rowList([['轉介原因及主要困難',c.reason],['優勢與興趣',c.strengths],['發展史及既有服務',c.history],
-      ['優先蒐集的鑑定方向',(c.focus||[]).map(k=>({id:'智能障礙',ld:'學習障礙',ebd:'情緒行為障礙',asd:'自閉症',dd:'發展遲緩'}[k]||k)).join('、')]]);
-    heading('三、認知能力評估');
-    rowList([['測驗狀態',iq.status],['測驗版本',iq.test],['施測日期',iq.date],['全量表（FSIQ）',iq.FSIQ],
-      ['95%信賴區間',txt_(iq.CI_low||'—')+'～'+txt_(iq.CI_high||'—')]]);
-    if(iq.status==='done')grid(['組合分數','分數'],Object.entries(iq.index||{}).map(([name,value])=>[name,value]));
-    heading('四、適應行為｜社會適應表現檢核表（第二版）');
-    if(ad.status==='done'){
-      rowList([['評量者',ad.rater==='其他'?ad.raterOther:ad.rater],['評量日期',ad.date]]);
-      const general=ad.general||[];
-      grid(['向度','一般學生組標準分數','百分等級'],DOMAINS_.map((d,i)=>[d,general[i]?.standard,general[i]?.percentile]));
-      lineChart_(body,DOMAINS_,general.map(x=>num_(x.standard)),'一般學生組標準分數');
-      if(idFollowup_(general)){
-        const scores=ad.idScores||[];
-        heading('智能障礙學生組｜分量表與平均分數');
-        grid(['分量表','量表分數'],SUBSCALES_.map((name,i)=>[name,scores[i]]));
-        const avgs=idMeans_(scores);
-        grid(['向度','平均量表分數'],DOMAINS_.map((d,i)=>[d,avgs[i]===null?'—':avgs[i].toFixed(2)]));
-        lineChart_(body,DOMAINS_,avgs,'智能障礙學生組平均量表分數');
-      }
-    }else rowList([['社會適應表現檢核表',ad.status==='none'?'尚無資料':'未使用本量表']]);
-    heading('五、五類鑑定方向的多元評量證據');
-    for(const [key,titles] of Object.entries(CATS_)){
-      const catName={id:'智能障礙',ld:'學習障礙',ebd:'情緒行為障礙',asd:'自閉症',dd:'發展遲緩'}[key];
-      body.appendParagraph(catName).setHeading(DocumentApp.ParagraphHeading.HEADING3);
-      const list=Array.isArray(p.evidence[key])?p.evidence[key]:[];
-      grid(['鑑定基準','蒐集狀態','證據說明'],titles.map((title,i)=>[title,STATUS_NAMES_[(list[i]||{}).status]||'尚待確認',(list[i]||{}).note||'—']));
-    }
-    heading('六、專業研判與教育支持需求');
-    rowList([['優先討論方向',rv.category],['主要證據',rv.basis],['教育需求',rv.needs],['課程調整與支持服務',rv.supports],['待補充或不同意見',rv.gaps]]);
-    body.appendParagraph('本摘要用於多元資料整理與教師初步研判，不能取代鑑輔會法定鑑定程序。');
-    body.appendParagraph('系統研發者：國家教育研究院黃彥融副研究員');
-    doc.saveAndClose();
-    return DriveApp.getFileById(id).getAs(MimeType.PDF).setName(filename);
-  }finally{
-    try{DriveApp.getFileById(id).setTrashed(true)}catch(e){Logger.log('暫存文件清除失敗：'+e.message)}
-  }
-}
-function lineChart_(body,domains,scores,title){
-  try{
-    if(typeof Charts==='undefined')return;
-    if(scores.length!==5||scores.some(x=>x===null||!Number.isFinite(x)))return;
-    const data=Charts.newDataTable();
-    data.addColumn(Charts.ColumnType.STRING,'向度');data.addColumn(Charts.ColumnType.NUMBER,'分數');
-    domains.forEach((d,i)=>data.addRow([d,Number(scores[i])]));
-    const chart=Charts.newLineChart().setDataTable(data.build()).setDimensions(580,270).setTitle(title).build();
-    body.appendImage(chart.getBlob());
-  }catch(err){Logger.log('折線圖未插入：'+err.message)}
-}
-
-/** 初次啟用時在 Apps Script 編輯器執行一次，完成寄信／文件匯出權限授予。 */
-function authorizeEmailReport(){
-  const quota=MailApp.getRemainingDailyQuota();
-  const temp=DocumentApp.create('SPED_mail_permission_check');
-  try{
-    temp.getBody().appendParagraph('PDF 報告寄送權限測試');temp.saveAndClose();
-    DriveApp.getFileById(temp.getId()).getAs(MimeType.PDF);
-  }finally{DriveApp.getFileById(temp.getId()).setTrashed(true)}
-  Logger.log('寄信權限已確認；目前剩餘收件者額度：'+quota);
 }
