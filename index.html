@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex,nofollow" />
-<title>特殊教育鑑定資料整合與專業研判輔助系統｜GitHub＋Sheets</title>
+<title>特殊教育鑑定資料整合與專業研判輔助系統｜GitHub＋Sheets v5</title>
 <style>
 :root{--ink:#1c3239;--muted:#627983;--line:#dce5e6;--bg:#f4f7f8;--white:#fff;--accent:#146d73;--soft:#eaf5f4;--warn:#945e20;--warnbg:#fff7e9;--bad:#963c45;--ok:#22704f}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
@@ -29,10 +29,8 @@ label{font-size:13px;font-weight:800;color:#2c535b;display:block;margin-bottom:7
 @media(max-width:680px){.grid,.grid3,.reviewcards,.taggrid{grid-template-columns:1fr}nav .steps{grid-template-columns:repeat(2,1fr)}.panel{padding:16px}.actions{align-items:stretch}.actions .right{flex:1}.btn{padding:10px 12px}header{padding:21px 17px}header h1{font-size:22px}}
 @media print{body{background:#fff}header,nav,#wizard,#actions,#toast,.footer{display:none!important}.shell{display:block;padding:0}main{width:100%}.report{display:block!important}.panel{border:0;box-shadow:none;padding:0}.chart{break-inside:avoid}table{font-size:10px}h2,h3,h4{break-after:avoid}@page{size:A4;margin:14mm}}
 
-.connect-label{display:block;margin-top:16px}
-.connect-access{max-width:420px}
 .feedback-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
-@media print{#submitMessage,#sheetAccessKey,.connect-label,.feedback-actions{display:none!important}}
+@media print{#submitMessage,.feedback-actions{display:none!important}}
 </style>
 </head>
 <body>
@@ -44,11 +42,11 @@ label{font-size:13px;font-weight:800;color:#2c535b;display:block;margin-bottom:7
 <script>
 'use strict';
 // 唯一要在 GitHub 設定的值：貼上「部署 > 網頁應用程式」的 /exec 網址。
-// 請勿把通行碼、試算表ID、學生個資寫在 GitHub 程式碼裡。
+// 本頁只包含 Apps Script 公開部署網址；切勿將個案資料或試算表 ID 提交至 GitHub。
 const SHEETS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwpaWwZidkg6wvx_2ADRRNBlGgngjQbAlI00mizOzcKSJEJrpT4pSz9cGdIu6_om8X2gQ/exec';
 const DOMAINS=['生活自理','動作與行動能力','語言與溝通','社會人際與情緒行為','學科（領域）學習表現'];
 const SCALE_MAP=[['飲食',0],['穿著',0],['衛生安全',0],['動作',1],['行動',1],['語言',2],['溝通',2],['社會人際',3],['情緒行為',3],['語文',4],['數學',4],['綜合應用',4]];
-const STEPS=['基本資料','困難與優勢','認知能力','社會適應','多元評量證據','證據整合','研判與確認'];
+const STEPS=['基本資料','困難與優勢','認知能力','適應行為','多元評量證據','證據整合','研判與確認'];
 const CATEGORIES={
  id:{name:'智能障礙',article:3,desc:'需同時檢視心智功能、四項適應行為向度至少一項的顯著困難，以及學科（領域）學習顯著困難。',questions:[
   ['心智功能','心智功能明顯低下或個別智力測驗顯著偏低；是否有有效測驗與信賴區間或其他佐證？'],
@@ -79,8 +77,8 @@ const CATEGORIES={
 const IQ_INDEX={WPPSI4_Y:[['VCI','語文理解'],['VSI','視覺空間'],['WMI','工作記憶']],WPPSI4_O:[['VCI','語文理解'],['VSI','視覺空間'],['FRI','流體推理'],['WMI','工作記憶'],['PSI','處理速度']],WISC4:[['VCI','語文理解'],['PRI','知覺推理'],['WMI','工作記憶'],['PSI','處理速度']],WISC5:[['VCI','語文理解'],['VSI','視覺空間'],['FRI','流體推理'],['WMI','工作記憶'],['PSI','處理速度']]};
 const INDEX_LABEL={VCI:'語文理解',VSI:'視覺空間',FRI:'流體推理',WMI:'工作記憶',PSI:'處理速度',PRI:'知覺推理'};
 let page=0;let activeCat='id';let saving=false;let latestSubmitted=false;let submittedCase=null;
-let lastPdf=null;let submissionAttempt=null;let lastAccessKey='';let iframeTimer=null;
-let S={meta:{mode:'anonymous',name:'',alias:'',sex:'',dob:'',assessDate:'',stage:'',grade:'',assessor:''},concerns:{reason:'',strengths:'',history:'',focus:[]},iq:{status:'none',test:'',date:'',FSIQ:null,CI_low:null,CI_high:null,index:{}},adaptive:{status:'none',rater:'',raterOther:'',date:'',general:DOMAINS.map(()=>({standard:null,percentile:''})),override:false,overrideReason:'',idScores:Array(12).fill(null)},evidence:Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,CATEGORIES[k].questions.map(()=>({status:'unknown',note:''}))])),review:{category:'待進一步評估',basis:'',needs:'',supports:'',gaps:'',agreement:false}};
+let lastPdf=null;let submissionAttempt=null;
+let S={meta:{mode:'anonymous',name:'',alias:'',sex:'',dob:'',assessDate:'',stage:'',grade:'',assessor:''},concerns:{reason:'',strengths:'',history:'',focus:[]},iq:{status:'none',test:'',date:'',FSIQ:null,CI_low:null,CI_high:null,index:{}},adaptive:{status:'none',rater:'',raterOther:'',date:'',general:DOMAINS.map(()=>({standard:null,percentile:''})),idScores:Array(12).fill(null)},evidence:Object.fromEntries(Object.keys(CATEGORIES).map(k=>[k,CATEGORIES[k].questions.map(()=>({status:'unknown',note:''}))])),review:{category:'待進一步評估',basis:'',needs:'',supports:'',gaps:'',agreement:false}};
 const el=id=>document.getElementById(id);
 const safe=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const v=(x)=>x==null?'':safe(x);const fmt=x=>x==null||x===''?'—':safe(x);
@@ -111,7 +109,7 @@ ${fld('評量基準日期','meta.assessDate','date','max="2099-12-31"',true)}
 ${select('教育階段','meta.stage',[['','請選擇'],['幼兒園','幼兒園'],['國小','國小'],['國中','國中'],['高中職','高中職'],['其他','其他']],'',true)}
 ${fld('年級／班別','meta.grade','text','maxlength="50"',false,'例如：中班、國小三年級')}
 ${fld('填寫教師／評估人員','meta.assessor','text','maxlength="80"',true)}
-</div>${notice('系統需以機構帳號限制登入及資料表權限；真實姓名、出生日期與測驗結果均屬敏感個案資料。')}</section>`}
+</div>${notice('本工具協助彙整多元評量證據，是否符合鑑定基準仍須由相關專業人員綜合研判。')}</section>`}
 function render2(){return `<section class="panel"><h2>02　學習與適應困難</h2><p class="lede">先描述實際困難、學生優勢，再決定需要蒐集哪些鑑定方向的證據。</p><div class="grid">${ta('轉介原因與最主要困難','concerns.reason','class="full" maxlength="3000"','例如：什麼情境、持續多久、對學習或參與造成什麼影響？')}${ta('學生／幼兒的優勢、興趣與已能做到的事','concerns.strengths','','請寫出可觀察的正向能力與優勢')}${ta('發展史、既有輔導或教育服務','concerns.history','','例如：早期發展、轉銜、曾接受的評估及服務')}</div><h3>目前希望優先了解的方向（可複選）</h3><div class="taggrid">${Object.entries(CATEGORIES).map(([k,c])=>`<label class="tag"><input type="checkbox" data-focus="${k}" ${S.concerns.focus.includes(k)?'checked':''}>${c.name}</label>`).join('')}</div>${notice('這裡只是選擇要進一步蒐集的證據方向，不是先替學生決定障礙類別。')}</section>`}
 function actualIQIndexes(){const age=dateAge(S.meta.dob,S.iq.date||S.meta.assessDate);if(S.iq.test==='WPPSI4')return (age&&age.totalMonths<48)?IQ_INDEX.WPPSI4_Y:IQ_INDEX.WPPSI4_O;return IQ_INDEX[S.iq.test]||[]}
 function iqAgeNote(){const age=dateAge(S.meta.dob,S.iq.date||S.meta.assessDate);if(!age||!S.iq.test)return '依出生與施測日期自動檢查適用年齡。';const m=age.totalMonths;const ok=S.iq.test==='WPPSI4'?m>=30&&m<96:m>=72&&m<204;return `${age.years}歲${age.months}月｜${ok?'符合此測驗版本年齡範圍':'注意：超出此測驗版本標示之適用年齡，請核對正式手冊'}`}
@@ -145,17 +143,20 @@ function adaptiveGeneral(){
   return {domain,standard,percentile:item.percentile??'',pr,status:standard!==null&&pr?'ok':'pending'};
  });
 }
-function hit(r){return !!r&&r.status==='ok'&&(r.standard<=72||r.pr.high<=3)}
-function idTrigger(){if(S.adaptive.status!=='done')return 'pending';const g=adaptiveGeneral(),first=g.slice(0,4).some(hit),last=hit(g[4]);if(first&&last)return 'yes';return g.every(x=>x.status==='ok')?'no':'pending'}
-function showID(){return S.adaptive.status==='done'&&(S.adaptive.override||idTrigger()==='yes')}
+// 只要前四向度任一向度符合（標準分數 <=72 或 PR <=3），
+// 且第五向度亦符合任一條件，就自動展開智能障礙學生組。
+// 不必等兩欄（標準分數與 PR）都填好才開啟；但送出前仍需填妥一般學生組資料。
+function hit(r){return !!r&&((r.standard!==null&&r.standard<=72)||(r.pr!==null&&r.pr.high<=3))}
+function idTrigger(){if(S.adaptive.status!=='done')return 'pending';const g=adaptiveGeneral();if(g.slice(0,4).some(hit)&&hit(g[4]))return 'yes';return g.every(x=>x.status==='ok')?'no':'pending'}
+function showID(){return idTrigger()==='yes'}
 function idAverages(){return DOMAINS.map((_,i)=>{const vals=SCALE_MAP.map(([,j],k)=>j===i?numeric(S.adaptive.idScores[k]):null).filter(v=>v!==null);return vals.length===SCALE_MAP.filter(([,j])=>j===i).length?vals.reduce((a,b)=>a+b,0)/vals.length:null})}
 function render4(){
  const g=adaptiveGeneral(),age=dateAge(S.meta.dob,S.adaptive.date||S.meta.assessDate),idStatus=idTrigger();
  let alert='';
- if(idStatus==='yes')alert=notice('符合智能障礙學生組補充檢視條件：前四向度至少一項標準分數≤72或PR≤3，且學科學習向度亦達該條件。本提示不是障礙鑑定結果。','warn');
+ if(idStatus==='yes')alert=notice('已自動展開「智能障礙學生組」：前四向度至少一項標準分數≤72或PR≤3，且第五向度也符合標準分數≤72或PR≤3。此為資料整理提示，不是鑑定結果。','warn');
  else if(idStatus==='no')alert=notice('依目前輸入的五向度資料，尚未符合自動開啟智能障礙學生組的雙條件。','success');
- else alert=notice('請提供完整的五向度標準分數及百分等級，才能檢視是否符合智能障礙學生組的開啟條件。');
- return `<section class="panel"><h2>04　社會適應表現檢核表（第二版）</h2>
+ else alert=notice('請依正式手冊填寫一般學生組五向度分數；符合前四向度任一項及第五向度的雙條件時，智能障礙學生組會自動顯示。');
+ return `<section class="panel"><h2>04　適應行為評量｜社會適應表現檢核表（第二版）</h2>
  <p class="lede">一般學生組僅需輸入五大向度的<strong>標準分數、百分等級</strong>，不需再次填寫原始分數。請依正式手冊完成計分後輸入。</p>
  ${radio('是否有檢核表結果','adaptive.status',[['none','尚無評量'],['done','已完成評量'],['not_applicable','不適用／其他工具']],true)}
  ${S.adaptive.status==='done'?`<div class="grid" style="margin-top:18px">
@@ -172,9 +173,7 @@ function render4(){
  <p class="tiny">百分等級可填單一數值（例如3）、範圍（例如4~5），或「&lt;1」「≤3」。區間僅在上限≤3時視為符合PR提示條件；標準分數與PR皆不由系統推算。</p>
  <div class="chart"><h4>一般學生組｜五向度標準分數折線圖</h4>${svgChart(g.map(x=>x.status==='ok'?x.standard:null),DOMAINS,{threshold:72,label:'標準分數'})}</div>
  <hr class="sectionrule">${alert}
- <label class="choice" style="margin-top:12px"><input type="checkbox" data-override="1" ${S.adaptive.override?'checked':''}>經專業評估需要補充檢視智能障礙學生組（手動開啟）</label>
- ${S.adaptive.override?`<div style="margin-top:12px">${ta('手動開啟的理由','adaptive.overrideReason','class="smallarea"','請簡述補充分析的需要')}</div>`:''}
- ${showID()?`<h3>智能障礙學生組｜十二個分量表量表分數</h3>
+ ${showID()?`<h3>智能障礙學生組｜十二個分量表的量表分數</h3>
  <p class="muted">依正式手冊取得十二個分量表「量表分數」並填入；系統只計算五向度算術平均，不自行換算量表分數。</p>
  <div class="tablewrap"><table><thead><tr><th>分量表</th><th>所屬向度</th><th>量表分數</th></tr></thead><tbody>
  ${SCALE_MAP.map(([name,idx],i)=>`<tr><td>${name}</td><td>${DOMAINS[idx]}</td><td><input type="number" min="0" step="0.01" data-idscore="${i}" value="${v(S.adaptive.idScores[i])}" aria-label="${name}量表分數"></td></tr>`).join('')}</tbody></table></div>
@@ -190,18 +189,15 @@ function render5(){const c=CATEGORIES[activeCat];return `<section class="panel">
  <div class="grid">${select('資料蒐集狀態',`evidence.${activeCat}.${i}.status`,[['unknown','尚待確認'],['yes','已有佐證'],['no','資料顯示未符合／不支持'],['missing','仍缺資料']])}
  ${ta('資料來源與具體佐證',`evidence.${activeCat}.${i}.note`,'class="smallarea"','可填課堂觀察、家長訪談、測驗、教學介入紀錄等')}</div></div>`).join('')}</section>`}
 function evidenceReview(cat){const ev=S.evidence[cat];return {has:ev.filter(x=>x.status==='yes').length,no:ev.filter(x=>x.status==='no').length,unknown:ev.filter(x=>x.status==='unknown'||x.status==='missing').length,notes:ev.map((x,i)=>x.status==='unknown'||x.status==='missing'?CATEGORIES[cat].questions[i][0]:null).filter(Boolean)}}
-function gapsList(){const a=[];if(!S.meta.dob||!S.meta.assessDate)a.push('基本日期不完整，無法檢查年齡。');if(!S.concerns.reason)a.push('尚未說明轉介原因與具體困難。');if(S.iq.status==='none')a.push('目前尚無認知能力評量資料，可依疑似障礙方向確認是否需要。');if(S.adaptive.status==='done'&&adaptiveGeneral().some(r=>r.status!=='ok'))a.push('社會適應檢核表五向度的標準分數／百分等級尚未填齊。');if(S.adaptive.status==='done'&&showID()&&S.adaptive.idScores.some(x=>x===null))a.push('智能障礙學生組尚有分量表量表分數未提供。');return a}
-function render6(){const rs=Object.entries(CATEGORIES).map(([k,c])=>({key:k,name:c.name,...evidenceReview(k)}));return `<section class="panel"><h2>06　證據整合與待補資料</h2><p class="lede">系統摘要各類的證據蒐集狀況，呈現需要追查的資料。這不是障礙類別的機率、診斷或正式鑑定結論。</p><div class="grid"><div class="inset"><label>個案</label><strong>${safe(S.meta.mode==='real'?S.meta.name:S.meta.alias)||'未填寫'}</strong><div class="muted">${ageNow()?`${ageNow().years}歲${ageNow().months}月`:'年齡未確認'}｜${safe(S.meta.stage)} ${safe(S.meta.grade)}</div></div><div class="inset"><label>目前資料</label><div>魏氏：${S.iq.status==='done'?safe(S.iq.test||'版本未選')+' FSIQ '+fmt(S.iq.FSIQ):'尚無有效分數'}</div><div>社會適應：${S.adaptive.status==='done'?(adaptiveGeneral().filter(x=>x.status==='ok').length+'/5向度已填入標準分數及PR'):'尚未取得'}</div></div></div><h3>五類鑑定方向的證據盤點</h3><div class="reviewcards">${rs.map(r=>`<div class="reviewcard"><h4>${r.name} <span class="pill">第${CATEGORIES[r.key].article}條</span></h4><p>有佐證 ${r.has} 項　｜　不支持 ${r.no} 項　｜　待確認／缺資料 ${r.unknown} 項</p><p class="muted">${r.notes.length?'待補：'+safe(r.notes.join('、')):'基準已逐項留下判斷（仍需專業綜合研判）'}</p>${r.key==='dd'&&ageNow()&&(ageNow().totalMonths<24||ageNow().totalMonths>=72)?`<p style="color:var(--bad)">年齡提醒：此年齡不在2歲至未滿6歲的學前特殊教育發展遲緩評估範圍，請核對適用資格。</p>`:''}</div>`).join('')}</div><h3>跨類別共同待補資料</h3>${gapsList().length?`<div class="notice warn">${gapsList().map(x=>`<div>• ${safe(x)}</div>`).join('')}</div>`:notice('目前已填的主要欄位較為完整，仍須檢查資料可信度、來源一致性及個別化教育需求。','success')}<h3>實務提醒</h3>${notice('智能障礙應同時檢視認知、適應行為及學科學習；學習障礙需有效介入資料；情緒行為障礙需跨情境與介入結果；自閉症需兩項核心特徵及功能影響；發展遲緩需未滿六歲且其他類別尚未明確。')}</section>`}
-function render7(){return `<section class="panel"><h2>07　教師初步研判與資料確認</h2><p class="lede">請核對整合結果並記錄專業初步研判。確認後由 Apps Script 接收並儲存到私人 Google Sheets，系統收到儲存確認才產生 PDF。</p>
+function gapsList(){const a=[];if(!S.meta.dob||!S.meta.assessDate)a.push('基本日期不完整，無法檢查年齡。');if(!S.concerns.reason)a.push('尚未說明轉介原因與具體困難。');if(S.iq.status==='none')a.push('目前尚無認知能力評量資料，可依疑似障礙方向確認是否需要。');if(S.adaptive.status==='done'&&adaptiveGeneral().some(r=>r.status!=='ok'))a.push('社會適應檢核表五向度的標準分數／百分等級尚未填齊。');if(S.adaptive.status==='done'&&showID()&&S.adaptive.idScores.some(x=>x===null))a.push('智能障礙學生組尚有分量表的量表分數未提供。');return a}
+function render6(){const rs=Object.entries(CATEGORIES).map(([k,c])=>({key:k,name:c.name,...evidenceReview(k)}));return `<section class="panel"><h2>06　證據整合與待補資料</h2><p class="lede">系統摘要各類的證據蒐集狀況，呈現需要追查的資料。這不是障礙類別的機率、診斷或正式鑑定結論。</p><div class="grid"><div class="inset"><label>個案</label><strong>${safe(S.meta.mode==='real'?S.meta.name:S.meta.alias)||'未填寫'}</strong><div class="muted">${ageNow()?`${ageNow().years}歲${ageNow().months}月`:'年齡未確認'}｜${safe(S.meta.stage)} ${safe(S.meta.grade)}</div></div><div class="inset"><label>目前資料</label><div>魏氏：${S.iq.status==='done'?safe(S.iq.test||'版本未選')+' FSIQ '+fmt(S.iq.FSIQ):'尚無有效分數'}</div><div>適應行為：${S.adaptive.status==='done'?(adaptiveGeneral().filter(x=>x.status==='ok').length+'/5向度已填入標準分數及PR'):'尚未取得'}</div></div></div><h3>五類鑑定方向的證據盤點</h3><div class="reviewcards">${rs.map(r=>`<div class="reviewcard"><h4>${r.name} <span class="pill">第${CATEGORIES[r.key].article}條</span></h4><p>有佐證 ${r.has} 項　｜　不支持 ${r.no} 項　｜　待確認／缺資料 ${r.unknown} 項</p><p class="muted">${r.notes.length?'待補：'+safe(r.notes.join('、')):'基準已逐項留下判斷（仍需專業綜合研判）'}</p>${r.key==='dd'&&ageNow()&&(ageNow().totalMonths<24||ageNow().totalMonths>=72)?`<p style="color:var(--bad)">年齡提醒：此年齡不在2歲至未滿6歲的學前特殊教育發展遲緩評估範圍，請核對適用資格。</p>`:''}</div>`).join('')}</div><h3>跨類別共同待補資料</h3>${gapsList().length?`<div class="notice warn">${gapsList().map(x=>`<div>• ${safe(x)}</div>`).join('')}</div>`:notice('目前已填的主要欄位較為完整，仍須檢查資料可信度、來源一致性及個別化教育需求。','success')}<h3>實務提醒</h3>${notice('智能障礙應同時檢視認知、適應行為及學科學習；學習障礙需有效介入資料；情緒行為障礙需跨情境與介入結果；自閉症需兩項核心特徵及功能影響；發展遲緩需未滿六歲且其他類別尚未明確。')}</section>`}
+function render7(){return `<section class="panel"><h2>07　教師初步研判與資料確認</h2>
  <div class="grid">${select('目前優先討論的鑑定方向','review.category',[['待進一步評估','待進一步評估'],...Object.values(CATEGORIES).map(c=>[c.name,c.name]),['非上述五類／需其他專業評估','非上述五類／需其他專業評估']],'',true)}
  ${ta('支持此方向的主要證據','review.basis','','請綜合已有的測驗、學習適應、觀察、訪談及介入資料')}
  ${ta('學生／幼兒的教育特殊需求','review.needs','','例如：學習方式、溝通、行為、生活自理與參與需求')}
  ${ta('課程調整與支持服務建議','review.supports','','包括課程內容、歷程、環境、評量與相關服務')}
  ${ta('仍待補充的資料或不同意見','review.gaps','','如資料間有矛盾，也請記錄')}</div>
  <hr class="sectionrule"><label class="choice"><input type="checkbox" data-agreement="1" ${S.review.agreement?'checked':''}>我已檢查資料，了解此摘要不是正式鑑定結論，仍須由鑑定專業人員依規定綜合研判。</label>
- <div style="margin-top:14px">${notice('使用 GitHub＋Google Apps Script。按下確認後先寫入 Sheets，收到後台回覆再下載 PDF。若網路中斷，使用相同個案編號重試，不會新增重複資料。')}</div><div class="connect-label"><label for="sheetAccessKey">資料傳送通行碼（管理員提供，不儲存於 GitHub）</label>
- <input id="sheetAccessKey" class="connect-access" type="password" autocomplete="off" maxlength="200" placeholder="請輸入管理員提供的通行碼" />
- <p class="tiny">GitHub 網址可以公開瀏覽，但 Sheet 為私人資料；請勿將通行碼或學生資料放進公開儲存庫。</p></div>
  <div id="submitMessage" style="margin-top:14px"></div></section>`}
 function svgChart(values,labels,opt={}){const entries=values.map((v,i)=>({v:numeric(v),i})).filter(x=>x.v!==null);if(!entries.length)return `<div class="chart-empty">尚無可繪製的正式分數</div>`;const width=680,height=270,ml=56,mr=18,mt=30,mb=80;const arr=entries.map(x=>x.v);if(opt.threshold!=null)arr.push(opt.threshold);let min=Math.floor((Math.min(...arr)-10)/10)*10,max=Math.ceil((Math.max(...arr)+10)/10)*10;if(min===max){min-=10;max+=10}const X=i=>ml+i*(width-ml-mr)/(labels.length-1),Y=v=>mt+(max-v)*(height-mt-mb)/(max-min);let bits=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${safe(opt.label||'折線圖')}">`;for(let j=0;j<=4;j++){let val=min+(max-min)*j/4,y=Y(val);bits+=`<line x1="${ml}" x2="${width-mr}" y1="${y}" y2="${y}" stroke="#e3eeee" stroke-width="1"/><text x="${ml-8}" y="${y+4}" font-size="12" fill="#6a8388" text-anchor="end">${numFmt(val)}</text>`}if(opt.threshold!=null&&opt.threshold>=min&&opt.threshold<=max){const y=Y(opt.threshold);bits+=`<line x1="${ml}" x2="${width-mr}" y1="${y}" y2="${y}" stroke="#bb8741" stroke-dasharray="7 5"/><text x="${width-mr-4}" y="${y-7}" text-anchor="end" fill="#926023" font-size="11">提示值 ${opt.threshold}</text>`}for(let i=0;i<labels.length;i++){bits+=`<text x="${X(i)}" y="${height-51}" text-anchor="middle" fill="#516b72" font-size="12">${safe(labels[i].replace('能力','').replace('表現','').replace('（領域）',''))}</text>`}for(let j=0;j<entries.length-1;j++){if(entries[j+1].i===entries[j].i+1)bits+=`<line x1="${X(entries[j].i)}" y1="${Y(entries[j].v)}" x2="${X(entries[j+1].i)}" y2="${Y(entries[j+1].v)}" stroke="#167b83" stroke-width="3"/>`}for(const x of entries){bits+=`<circle cx="${X(x.i)}" cy="${Y(x.v)}" r="5" fill="#157a83" stroke="#fff" stroke-width="2"/><text x="${X(x.i)}" y="${Y(x.v)-12}" text-anchor="middle" fill="#165f68" font-size="13" font-weight="700">${numFmt(x.v,2)}</text>`}bits+='</svg>';return bits}
 function previewSummary(){
@@ -225,7 +221,6 @@ function captureEvt(e){
  else if(t.dataset?.generalPr!=null){S.adaptive.general[+t.dataset.generalPr].percentile=t.value.trim();latestSubmitted=false;submissionAttempt=null;if(e.type==='change')render();}
  else if(t.dataset?.idscore!=null){S.adaptive.idScores[+t.dataset.idscore]=numeric(t.value);latestSubmitted=false;submissionAttempt=null;if(e.type==='change')render();}
  else if(t.dataset?.focus){const k=t.dataset.focus;S.concerns.focus=t.checked?[...new Set([...S.concerns.focus,k])]:S.concerns.focus.filter(x=>x!==k);latestSubmitted=false;submissionAttempt=null}
- else if(t.dataset?.override){S.adaptive.override=t.checked;latestSubmitted=false;render()}
  else if(t.dataset?.agreement){S.review.agreement=t.checked;latestSubmitted=false;submissionAttempt=null}
 }
 function validatePage(n=page){
@@ -245,8 +240,7 @@ function validatePage(n=page){
   for(const g of adaptiveGeneral()){
    if(g.standard===null||g.standard<0||g.standard>200||!g.pr)return '一般學生組的五向度標準分數與PR須完整填寫，PR可填數值或明確區間。';
   }
-  if(S.adaptive.override&&!S.adaptive.overrideReason.trim())return '手動開啟智能障礙學生組時，請簡述理由。';
-  if(showID()&&S.adaptive.idScores.some(x=>x!==null&&(x<0||!Number.isFinite(x))))return '智能障礙學生組分量表量表分數請填非負數。';
+  if(showID()&&S.adaptive.idScores.some(x=>x!==null&&(x<0||!Number.isFinite(x))))return '智能障礙學生組分量表的量表分數請填非負數。';
  }
  if(n===6){if(!S.review.agreement)return '請確認資料整理不是正式鑑定結果。';if(!S.review.basis.trim())return '請填入專業初步研判的主要證據。';}
  return '';
@@ -270,7 +264,7 @@ function isTrustedReceipt(event){
    return host==='script.google.com'||host==='script.googleusercontent.com'||host.endsWith('.script.googleusercontent.com')||host.endsWith('-script.googleusercontent.com');
  }catch(e){return false}
 }
-function sendWithIframe(attempt,accessKey){
+function sendWithIframe(attempt){
  return new Promise((resolve,reject)=>{
   let settled=false;let frame=null,form=null,timer=null;
   const cleanup=()=>{window.removeEventListener('message',receive);if(timer)clearTimeout(timer);if(form)form.remove();if(frame)frame.remove();};
@@ -290,7 +284,7 @@ function sendWithIframe(attempt,accessKey){
     document.body.appendChild(frame);
     form=document.createElement('form');form.method='POST';form.action=SHEETS_WEB_APP_URL;
     form.target=frame.name;form.style.display='none';
-    for(const [key,val] of Object.entries({payload:JSON.stringify(attempt.payload),nonce:attempt.nonce,access_key:accessKey})){
+    for(const [key,val] of Object.entries({payload:JSON.stringify(attempt.payload),nonce:attempt.nonce})){
       const input=document.createElement('input');input.type='hidden';input.name=key;input.value=val;form.appendChild(input);
     }
     document.body.appendChild(form);form.submit();
@@ -318,9 +312,6 @@ async function pdfAfterSaved(caseId){
 }
 async function submitAttempt(){
  if(saving||latestSubmitted)return;
- const token=el('sheetAccessKey')?.value.trim()||lastAccessKey;
- if(!token){toast('請先輸入管理員提供的資料傳送通行碼。');return;}
- lastAccessKey=token;
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(SHEETS_WEB_APP_URL)){
   toast('尚未設定 Apps Script 網頁應用程式網址。請在 index.html 的 SHEETS_WEB_APP_URL 貼入 /exec 網址。');return;
  }
@@ -332,7 +323,7 @@ async function submitAttempt(){
  saving=true;el('nextBtn').disabled=true;el('nextBtn').textContent='正在確認 Google Sheets…';
  setSubmitStatus(notice('正在傳送至 Google Sheets。請保持此頁面開啟，等待後台確認。'));
  try{
-   const receipt=await sendWithIframe(submissionAttempt,token);
+   const receipt=await sendWithIframe(submissionAttempt);
    latestSubmitted=true;submittedCase=receipt.caseId;
    el('nextBtn').textContent='已確認並儲存';el('nextBtn').disabled=true;
    await pdfAfterSaved(receipt.caseId);
@@ -340,7 +331,7 @@ async function submitAttempt(){
    const msg=String(err.message||'後台尚未回覆');
    el('nextBtn').textContent='用原個案編號重試提交';el('nextBtn').disabled=false;
    setSubmitStatus(notice(msg,'danger')+`<div class="feedback-actions"><button type="button" class="btn ghost" id="retrySubmit">重試（不產生新個案編號）</button></div>`);
- }finally{saving=false;lastAccessKey='';const box=el('sheetAccessKey');if(box)box.value='';}
+ }finally{saving=false;}
 }
 function finish(){
  for(const n of [0,1,2,3,6]){const err=validatePage(n);if(err){page=n;render();toast(err);return}}
